@@ -3,3 +3,4 @@ uvicorn
 groq
 gtts
 dotenv
+jinja2
