@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h2>🎙️ Speech Translator</h2>
+
+    <button id="recordBtn">🎤 Start Recording</button>
+    <p id="status"></p>
+    
+    <div id="result" style="display:none;">
+        <h3>Original:</h3>
+        <p id="originalText"></p>
+        <audio id="originalAudio" controls></audio>
+
+        <h3>Translated:</h3>
+        <p id="translatedText"></p>
+        <audio id="translatedAudio" controls></audio>
+    </div>
+
+    <script>
+        let recordBtn = document.getElementById("recordBtn");
+        let statusEl = document.getElementById("status");
+        let mediaRecorder;
+        let chunks = [];
+        let isRecording = false;
+
+        recordBtn.addEventListener("click", async () => {
+            if (!isRecording) {
+                // Start recording
+                let stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                chunks = [];
+
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = async () => {
+                    statusEl.innerText = "Processing...";
+                    let blob = new Blob(chunks, { type: 'audio/webm' });
+                    let formData = new FormData();
+                    formData.append("audio", blob, "recording.webm");
+
+                    let res = await fetch("http://127.0.0.1:8000/translate", { 
+                        method: "POST", 
+                        body: formData 
+                    });
+
+                    let data = await res.json();
+                    if (data.error) {
+                        statusEl.innerText = "Error: " + data.error;
+                        return;
+                    }
+
+                    document.getElementById("originalText").innerText = data.original_text;
+                    document.getElementById("translatedText").innerText = data.translated_text;
+                    document.getElementById("originalAudio").src = data.original_audio;
+                    document.getElementById("translatedAudio").src = data.translated_audio;
+
+                    document.getElementById("result").style.display = "block";
+                    statusEl.innerText = "Done!";
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.innerText = "⏹ Stop Recording";
+                statusEl.innerText = "Recording...";
+            } else {
+                // Stop recording
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.innerText = "🎤 Start Recording";
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+groq
+pyaudio
+speech_recognition
+gtts
+pydub
