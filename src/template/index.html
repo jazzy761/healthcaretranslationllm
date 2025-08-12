@@ -9,7 +9,7 @@
 
     <button id="recordBtn">🎤 Start Recording</button>
     <p id="status"></p>
-    
+
     <div id="result" style="display:none;">
         <h3>Original:</h3>
         <p id="originalText"></p>
@@ -21,55 +21,81 @@
     </div>
 
     <script>
-        let recordBtn = document.getElementById("recordBtn");
-        let statusEl = document.getElementById("status");
-        let mediaRecorder;
-        let chunks = [];
+        const recordBtn = document.getElementById("recordBtn");
+        const statusEl = document.getElementById("status");
+        const originalTextEl = document.getElementById("originalText");
+        const translatedTextEl = document.getElementById("translatedText");
+        const originalAudioEl = document.getElementById("originalAudio");
+        const translatedAudioEl = document.getElementById("translatedAudio");
+        const resultDiv = document.getElementById("result");
+
+        let recognition;
         let isRecording = false;
 
-        recordBtn.addEventListener("click", async () => {
-            if (!isRecording) {
-                // Start recording
-                let stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                chunks = [];
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            alert("Your browser does not support the Web Speech API. Please use Chrome or Edge.");
+        } else {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = "en-US";
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
 
-                mediaRecorder.ondataavailable = e => chunks.push(e.data);
-                mediaRecorder.onstop = async () => {
-                    statusEl.innerText = "Processing...";
-                    let blob = new Blob(chunks, { type: 'audio/webm' });
-                    let formData = new FormData();
-                    formData.append("audio", blob, "recording.webm");
+            recognition.onstart = () => {
+                statusEl.innerText = "Recording...";
+                recordBtn.innerText = "⏹ Stop Recording";
+                isRecording = true;
+            };
 
-                    let res = await fetch("http://127.0.0.1:8000/translate", { 
-                        method: "POST", 
-                        body: formData 
-                    });
+            recognition.onresult = async (event) => {
+                const spokenText = event.results[0][0].transcript;
+                statusEl.innerText = "Processing...";
+                
+                // Send text to backend
+                const formData = new FormData();
+                formData.append("text", spokenText);
 
-                    let data = await res.json();
+                try {
+                    const res = await fetch("/translate", { method: "POST", body: formData });
+                    const data = await res.json();
+
                     if (data.error) {
                         statusEl.innerText = "Error: " + data.error;
                         return;
                     }
 
-                    document.getElementById("originalText").innerText = data.original_text;
-                    document.getElementById("translatedText").innerText = data.translated_text;
-                    document.getElementById("originalAudio").src = data.original_audio;
-                    document.getElementById("translatedAudio").src = data.translated_audio;
-
-                    document.getElementById("result").style.display = "block";
+                    originalTextEl.innerText = data.original_text;
+                    translatedTextEl.innerText = data.translated_text;
+                    originalAudioEl.src = data.original_audio;
+                    translatedAudioEl.src = data.translated_audio;
+                    resultDiv.style.display = "block";
                     statusEl.innerText = "Done!";
-                };
+                } catch (e) {
+                    statusEl.innerText = "Error: " + e.message;
+                }
+            };
 
-                mediaRecorder.start();
-                isRecording = true;
-                recordBtn.innerText = "⏹ Stop Recording";
-                statusEl.innerText = "Recording...";
-            } else {
-                // Stop recording
-                mediaRecorder.stop();
+            recognition.onerror = (event) => {
+                statusEl.innerText = "Error: " + event.error;
                 isRecording = false;
                 recordBtn.innerText = "🎤 Start Recording";
+            };
+
+            recognition.onend = () => {
+                if (isRecording) {
+                    // Automatically stop recording after speech ends
+                    recognition.stop();
+                    isRecording = false;
+                    recordBtn.innerText = "🎤 Start Recording";
+                }
+            };
+        }
+
+        recordBtn.addEventListener("click", () => {
+            if (isRecording) {
+                recognition.stop();
+            } else {
+                recognition.start();
             }
         });
     </script>
