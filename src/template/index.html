@@ -84,10 +84,10 @@
             recognition.onend = () => {
                 if (isRecording) {
                     // Automatically stop recording after speech ends
-                    //recognition.stop();
+                    recognition.stop();
                     isRecording = false;
                     recordBtn.innerText = "🎤 Start Recording";
-                    statusEl.innerText = "Click to start recording"
+                    
                 }
             };
         }
